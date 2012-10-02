@@ -31,6 +31,7 @@ endif
 
 COBJS-$(CONFIG_BFIN_SDH) += bfin_sdh.o
 COBJS-$(CONFIG_DAVINCI_MMC) += davinci_mmc.o
+COBJS-$(CONFIG_DOVE_SDHCI) += dove_sdhci.o
 COBJS-$(CONFIG_FSL_ESDHC) += fsl_esdhc.o
 COBJS-$(CONFIG_FTSDC010) += ftsdc010_esdhc.o
 COBJS-$(CONFIG_GENERIC_MMC) += mmc.o
