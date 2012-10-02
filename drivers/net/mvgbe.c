@@ -43,6 +43,8 @@
 #include <asm/arch/kirkwood.h>
 #elif defined(CONFIG_ORION5X)
 #include <asm/arch/orion5x.h>
+#elif defined(CONFIG_DOVE)
+#include <asm/arch/dove.h>
 #endif
 
 #include "mvgbe.h"
@@ -52,7 +54,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define MV_PHY_ADR_REQUEST 0xee
 #define MVGBE_SMI_REG (((struct mvgbe_registers *)MVGBE0_BASE)->smi)
 
-#if defined(CONFIG_MII) || defined(CONFIG_CMD_MII)
+#if defined(CONFIG_PHYLIB) || defined(CONFIG_MII) || defined(CONFIG_CMD_MII)
 /*
  * smi_reg_read - miiphy_read callback function.
  *
@@ -65,6 +67,9 @@ static int smi_reg_read(const char *devname, u8 phy_adr, u8 reg_ofs, u16 * data)
 	struct mvgbe_registers *regs = dmvgbe->regs;
 	u32 smi_reg;
 	u32 timeout;
+
+	printf("%s\n", __func__);
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
 
 	/* Phyadr read request */
 	if (phy_adr == MV_PHY_ADR_REQUEST &&
@@ -126,6 +131,8 @@ static int smi_reg_read(const char *devname, u8 phy_adr, u8 reg_ofs, u16 * data)
 	debug("%s:(adr %d, off %d) value= %04x\n", __FUNCTION__, phy_adr,
 		reg_ofs, *data);
 
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
+
 	return 0;
 }
 
@@ -142,6 +149,9 @@ static int smi_reg_write(const char *devname, u8 phy_adr, u8 reg_ofs, u16 data)
 	struct mvgbe_registers *regs = dmvgbe->regs;
 	u32 smi_reg;
 	u32 timeout;
+
+	printf("%s\n", __func__);
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
 
 	/* Phyadr write request*/
 	if (phy_adr == MV_PHY_ADR_REQUEST &&
@@ -180,7 +190,27 @@ static int smi_reg_write(const char *devname, u8 phy_adr, u8 reg_ofs, u16 data)
 	/* write the smi register */
 	MVGBE_REG_WR(MVGBE_SMI_REG, smi_reg);
 
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
+
 	return 0;
+}
+#endif
+
+#if defined(CONFIG_PHYLIB)
+int mvgbe_phy_read(struct mii_dev *bus, int phyAddr, int devAddr, int regAddr)
+{
+	u16 data;
+	int ret;
+	ret = smi_reg_read(bus->name, phyAddr, regAddr, &data);
+	if (ret)
+		return ret;
+	return data;
+}
+
+int mvgbe_phy_write(struct mii_dev *bus, int phyAddr, int devAddr, int regAddr,
+	u16 data)
+{
+	return smi_reg_write(bus->name, phyAddr, regAddr, data);
 }
 #endif
 
@@ -188,6 +218,8 @@ static int smi_reg_write(const char *devname, u8 phy_adr, u8 reg_ofs, u16 data)
 static void stop_queue(u32 * qreg)
 {
 	u32 reg_data;
+
+	printf("%s\n", __func__);
 
 	reg_data = readl(qreg);
 
@@ -221,6 +253,9 @@ static void set_access_control(struct mvgbe_registers *regs,
 {
 	u32 access_prot_reg;
 
+	printf("%s\n", __func__);
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
+
 	/* Set access control register */
 	access_prot_reg = MVGBE_REG_RD(regs->epap);
 	/* clear window permission */
@@ -244,12 +279,17 @@ static void set_access_control(struct mvgbe_registers *regs,
 		MVGBE_REG_BITS_RESET(regs->bare, (1 << param->win));
 	else
 		MVGBE_REG_BITS_SET(regs->bare, (1 << param->win));
+
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
 }
 
 static void set_dram_access(struct mvgbe_registers *regs)
 {
 	struct mvgbe_winparam win_param;
 	int i;
+
+	printf("%s\n", __func__);
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
 
 	for (i = 0; i < CONFIG_NR_DRAM_BANKS; i++) {
 		/* Set access parameters for DRAM bank i */
@@ -266,6 +306,9 @@ static void set_dram_access(struct mvgbe_registers *regs)
 			win_param.enable = 0;
 		else
 			win_param.enable = 1;	/* Enable the access */
+
+		printf("%s: i = %d, base = %08x, size = %08x, en = %d\n", __func__, i,
+		       win_param.base_addr, win_param.size, win_param.enable);
 
 		/* Enable DRAM bank */
 		switch (i) {
@@ -290,6 +333,23 @@ static void set_dram_access(struct mvgbe_registers *regs)
 		/* Set the access control for address window(EPAPR) RD/WR */
 		set_access_control(regs, &win_param);
 	}
+
+	MVGBE_REG_WR(regs->barsz[0].bar,  0x00000000);
+	MVGBE_REG_WR(regs->barsz[0].size, 0x1fff0000);
+	MVGBE_REG_WR(regs->barsz[1].bar,  0x20000000);
+	MVGBE_REG_WR(regs->barsz[1].size, 0x1fff0000);
+	MVGBE_REG_WR(regs->barsz[2].bar,  0xf800fe01);
+	MVGBE_REG_WR(regs->barsz[2].size, 0x007f0000);
+	MVGBE_REG_WR(regs->barsz[3].bar,  0xfb000003);
+	MVGBE_REG_WR(regs->barsz[3].size, 0x00000000);
+	MVGBE_REG_WR(regs->barsz[4].bar,  0xffc0fd01);
+	MVGBE_REG_WR(regs->barsz[4].size, 0x003f0000);
+	MVGBE_REG_WR(regs->barsz[5].bar,  0xf000e004);
+	MVGBE_REG_WR(regs->barsz[5].size, 0x007f0000);
+	MVGBE_REG_WR(regs->bare,          0x00000000);
+
+	printf("%s\n", __func__);
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
 }
 
 /*
@@ -302,6 +362,9 @@ static void port_init_mac_tables(struct mvgbe_registers *regs)
 {
 	int table_index;
 
+	printf("%s\n", __func__);
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
+
 	/* Clear DA filter unicast table (Ex_dFUT) */
 	for (table_index = 0; table_index < 4; ++table_index)
 		MVGBE_REG_WR(regs->dfut[table_index], 0);
@@ -312,6 +375,8 @@ static void port_init_mac_tables(struct mvgbe_registers *regs)
 		/* Clear DA filter other multicast table (Ex_dFOMT) */
 		MVGBE_REG_WR(regs->dfomt[table_index], 0);
 	}
+
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
 }
 
 /*
@@ -334,6 +399,9 @@ static int port_uc_addr(struct mvgbe_registers *regs, u8 uc_nibble,
 	u32 unicast_reg;
 	u32 tbl_offset;
 	u32 reg_offset;
+
+	printf("%s\n", __func__);
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
 
 	/* Locate the Unicast table entry */
 	uc_nibble = (0xf & uc_nibble);
@@ -362,6 +430,9 @@ static int port_uc_addr(struct mvgbe_registers *regs, u8 uc_nibble,
 	default:
 		return 0;
 	}
+
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
+
 	return 1;
 }
 
@@ -373,6 +444,9 @@ static void port_uc_addr_set(struct mvgbe_registers *regs, u8 * p_addr)
 	u32 mac_h;
 	u32 mac_l;
 
+	printf("%s\n", __func__);
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
+
 	mac_l = (p_addr[4] << 8) | (p_addr[5]);
 	mac_h = (p_addr[0] << 24) | (p_addr[1] << 16) | (p_addr[2] << 8) |
 		(p_addr[3] << 0);
@@ -382,6 +456,8 @@ static void port_uc_addr_set(struct mvgbe_registers *regs, u8 * p_addr)
 
 	/* Accept frames of this address */
 	port_uc_addr(regs, p_addr[5], ACCEPT_MAC_ADDR);
+
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
 }
 
 /*
@@ -391,6 +467,8 @@ static void mvgbe_init_rx_desc_ring(struct mvgbe_device *dmvgbe)
 {
 	struct mvgbe_rxdesc *p_rx_desc;
 	int i;
+
+	printf("%s\n", __func__);
 
 	/* initialize the Rx descriptors ring */
 	p_rx_desc = dmvgbe->p_rxdesc;
@@ -419,6 +497,9 @@ static int mvgbe_init(struct eth_device *dev)
 	 && defined (CONFIG_SYS_FAULT_ECHO_LINK_DOWN)
 	int i;
 #endif
+	printf("%s\n", __func__);
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
+
 	/* setup RX rings */
 	mvgbe_init_rx_desc_ring(dmvgbe);
 
@@ -438,6 +519,11 @@ static int mvgbe_init(struct eth_device *dev)
 	MVGBE_REG_WR(regs->pxc, PRT_CFG_VAL);
 	MVGBE_REG_WR(regs->pxcx, PORT_CFG_EXTEND_VALUE);
 	MVGBE_REG_WR(regs->psc0, PORT_SERIAL_CONTROL_VALUE);
+
+	MVGBE_REG_BITS_RESET(regs->psc0, MVGBE_FORCE_LINK_PASS);
+	MVGBE_REG_BITS_RESET(regs->psc0, MVGBE_DIS_AUTO_NEG_FOR_DUPLX);
+	MVGBE_REG_BITS_RESET(regs->psc0, MVGBE_DIS_AUTO_NEG_FOR_FLOW_CTRL);
+	MVGBE_REG_BITS_RESET(regs->psc0, MVGBE_ADV_NO_FLOW_CTRL);
 
 	/* Assign port SDMA configuration */
 	MVGBE_REG_WR(regs->sdc, PORT_SDMA_CFG_VALUE);
@@ -468,7 +554,7 @@ static int mvgbe_init(struct eth_device *dev)
 	MVGBE_REG_WR(regs->rqc, (1 << RXUQ));
 
 #if (defined (CONFIG_MII) || defined (CONFIG_CMD_MII)) \
-	 && defined (CONFIG_SYS_FAULT_ECHO_LINK_DOWN)
+	&& defined (CONFIG_SYS_FAULT_ECHO_LINK_DOWN)
 	/* Wait up to 5s for the link status */
 	for (i = 0; i < 5; i++) {
 		u16 phyadr;
@@ -484,6 +570,8 @@ static int mvgbe_init(struct eth_device *dev)
 	printf("No link on %s\n", dev->name);
 	return -1;
 #endif
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
+
 	return 0;
 }
 
@@ -491,6 +579,9 @@ static int mvgbe_halt(struct eth_device *dev)
 {
 	struct mvgbe_device *dmvgbe = to_mvgbe(dev);
 	struct mvgbe_registers *regs = dmvgbe->regs;
+
+	printf("%s\n", __func__);
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
 
 	/* Disable all gigE address decoder */
 	MVGBE_REG_WR(regs->bare, 0x3f);
@@ -512,6 +603,8 @@ static int mvgbe_halt(struct eth_device *dev)
 	MVGBE_REG_WR(regs->pim, 0);
 	MVGBE_REG_WR(regs->peim, 0);
 
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
+
 	return 0;
 }
 
@@ -520,8 +613,14 @@ static int mvgbe_write_hwaddr(struct eth_device *dev)
 	struct mvgbe_device *dmvgbe = to_mvgbe(dev);
 	struct mvgbe_registers *regs = dmvgbe->regs;
 
+	printf("%s\n", __func__);
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
+
 	/* Programs net device MAC address after initialization */
 	port_uc_addr_set(regs, dmvgbe->dev.enetaddr);
+
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
+
 	return 0;
 }
 
@@ -533,6 +632,10 @@ static int mvgbe_send(struct eth_device *dev, void *dataptr, int datasize)
 	void *p = (void *)dataptr;
 	u32 cmd_sts;
 	u32 txuq0_reg_addr;
+	int timeout;
+
+	printf("%s\n", __func__);
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
 
 	/* Copy buffer if it's misaligned */
 	if ((u32) dataptr & 0x07) {
@@ -555,17 +658,26 @@ static int mvgbe_send(struct eth_device *dev, void *dataptr, int datasize)
 
 	/* Set this tc desc as zeroth TXUQ */
 	txuq0_reg_addr = (u32)&regs->tcqdp[TXUQ];
+
+	printf("%s : cmd_sts = %08x, buf_ptr = %p, byte_cnt = %08x -> %08x\n",
+	       __func__, p_txdesc->cmd_sts, p_txdesc->buf_ptr, p_txdesc->byte_cnt, txuq0_reg_addr);
+
 	writel((u32) p_txdesc, txuq0_reg_addr);
 
 	/* ensure tx desc writes above are performed before we start Tx DMA */
 	isb();
 
+	printf("PS0 = %08x\n", MVGBE_REG_RD(regs->ps0));
+
 	/* Apply send command using zeroth TXUQ */
 	MVGBE_REG_WR(regs->tqc, (1 << TXUQ));
+
+	printf("%s send\n", __func__);
 
 	/*
 	 * wait for packet xmit completion
 	 */
+	timeout = 1000;
 	cmd_sts = readl(&p_txdesc->cmd_sts);
 	while (cmd_sts & MVGBE_BUFFER_OWNED_BY_DMA) {
 		/* return fail if error is detected */
@@ -576,7 +688,18 @@ static int mvgbe_send(struct eth_device *dev, void *dataptr, int datasize)
 			return -1;
 		}
 		cmd_sts = readl(&p_txdesc->cmd_sts);
+		if (timeout--) {
+			udelay(1000);
+			printf("PS0 = %08x\n", MVGBE_REG_RD(regs->ps0));
+		} else {
+			printf("%s transmit timeout\n", __func__);
+			return -ETIMEDOUT;
+		}
 	};
+
+	printf("%s done\n", __func__);
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
+
 	return 0;
 }
 
@@ -587,6 +710,8 @@ static int mvgbe_recv(struct eth_device *dev)
 	u32 cmd_sts;
 	u32 timeout = 0;
 	u32 rxdesc_curr_addr;
+
+	printf("%s\n", __func__);
 
 	/* wait untill rx packet available or timeout */
 	do {
@@ -647,6 +772,52 @@ static int mvgbe_recv(struct eth_device *dev)
 	return 0;
 }
 
+#if defined(CONFIG_PHYLIB)
+int mvgbe_phylib_init(struct eth_device *dev, int phyid)
+{
+	struct mii_dev *bus;
+	struct phy_device *phydev;
+	int ret;
+	struct mvgbe_device *dmvgbe = to_mvgbe(dev);
+	struct mvgbe_registers *regs = dmvgbe->regs;
+
+	printf("%s\n", __func__);
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
+
+	bus = mdio_alloc();
+	if (!bus) {
+		printf("mdio_alloc failed\n");
+		return -ENOMEM;
+	}
+	bus->read = mvgbe_phy_read;
+	bus->write = mvgbe_phy_write;
+	sprintf(bus->name, dev->name);
+	
+	ret = mdio_register(bus);
+	if (ret) {
+		printf("mdio_register failed\n");
+		free(bus);
+		return -ENOMEM;
+	}
+
+	/* Set phy address of the port */
+	mvgbe_phy_write(bus, MV_PHY_ADR_REQUEST, 0, MV_PHY_ADR_REQUEST, phyid);
+
+	phydev = phy_connect(bus, phyid, dev, PHY_INTERFACE_MODE_RGMII);
+	if (!phydev) {
+		printf("phy_connect failed\n");
+		return -ENODEV;
+	}
+
+	phy_config(phydev);
+	phy_startup(phydev);
+
+	printf("%s : %08x %08x %08x\n", __func__, MVGBE_REG_RD(regs->euic), MVGBE_REG_RD(regs->euea), MVGBE_REG_RD(regs->euiae));
+
+	return 0;
+}
+#endif
+
 int mvgbe_initialize(bd_t *bis)
 {
 	struct mvgbe_device *dmvgbe;
@@ -655,6 +826,8 @@ int mvgbe_initialize(bd_t *bis)
 	u8 used_ports[MAX_MVGBE_DEVS] = CONFIG_MVGBE_PORTS;
 
 	for (devnum = 0; devnum < MAX_MVGBE_DEVS; devnum++) {
+		printf("%sL port = %d\n", __func__, devnum);
+
 		/*skip if port is configured not to use */
 		if (used_ports[devnum] == 0)
 			continue;
@@ -729,7 +902,9 @@ error1:
 
 		eth_register(dev);
 
-#if defined(CONFIG_MII) || defined(CONFIG_CMD_MII)
+#if defined(CONFIG_PHYLIB)
+		mvgbe_phylib_init(dev, PHY_BASE_ADR + devnum);
+#elif defined(CONFIG_MII) || defined(CONFIG_CMD_MII)
 		miiphy_register(dev->name, smi_reg_read, smi_reg_write);
 		/* Set phy address of the port */
 		miiphy_write(dev->name, MV_PHY_ADR_REQUEST,
