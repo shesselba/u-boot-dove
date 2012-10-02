@@ -29,6 +29,8 @@
 #include <asm/arch/orion5x.h>
 #elif defined(CONFIG_KIRKWOOD)
 #include <asm/arch/kirkwood.h>
+#elif defined(CONFIG_DOVE)
+#include <asm/arch/dove.h>
 #endif
 
 /* SATA port registers */
